@@ -1,0 +1,53 @@
+    如果用Java去获取一个SSAS的cube，这在微软技术（C#）编写的客户端，这是非常容易的事情，因为有大量的文档和例子。而用java从SSAS中获取数据却很少有文档，但这是可以做到的，因为SSAS用到了XMLA。
+
+      第一件事是你需要建立一个HTTP访问。这一步通常有好几个选项供你选择，一是可以开发一个web服务客户端去调用SSAS web服务。另一个是用类似JDBC的驱动：olap4j和jdbc4Olap。
+
+    cube是SQL Server 2008 的。服务器是WAS（Webshpere Application Server 7.0），这意味着需要JDK1.6。jdbc选择了olap4j
+
+     综上所述，java程序使用web服务客户端或者类似jdbc的驱动通过XMLA与IIS进行连接。IIS用处理HTTP请求再用msmdpump.dll把请求传输到SSAS中。
+第一步——安装jar包
+
+复制.jar文件到你的class path，import到java文件中。
+
+import org.olap4j.*  
+
+第二步——建立连接 
+  
+Class.forName("org.olap4j.driver.xmla.XmlaOlap4jDriver");    
+OlapConnection con = (OlapConnection)DriverManager.getConnection("jdbc:xmla:Server=http://myserver/olap/msmdpump.dll;Catalog=MyCatalog");    
+OlapWrapper wrapper = (OlapWrapper) con;    
+OlapConnection olapConnection = wrapper.unwrap(OlapConnection.class);    
+OlapStatement stmt = olapConnection.createStatement(); 
+
+ 
+
+第三步——执行OLAP查询
+
+在这里写MDX语句，让SSAS查询：
+
+
+CellSet cellSet = stmt.executeOlapQuery("SELECT {[Measures].[Qty], [Measures].[Cost Base]} ON Columns, {[Product].[Category].[Category]} ON Rows FROM [Invoices]"); 
+
+第四步——结果处理
+
+下面的代码通过两重循环填充dataset。关键是你可以访问MDX返回的结果的行和列了。
+
+  
+DataSet ds = new DataSet();    
+for (Position rowPos : cellSet.getAxes().get(1)) {    
+  ds.addRow();    
+  for (Position colPos : cellSet.getAxes().get(0)) {   
+    test += Integer.toString(rowPos.getOrdinal()) + " : " + Integer.toString(colPos.getOrdinal());    
+    Cell cell = cellSet.getCell(colPos, rowPos);   
+    test += "Value: " + cell.getFormattedValue() + "<br />";  
+    ds.addValue("column" + Integer.toString(colPos.getOrdinal()), cell.getFormattedValue());    
+  }    
+} 
+
+ 
+
+ 
+
+ 
+
+ 
